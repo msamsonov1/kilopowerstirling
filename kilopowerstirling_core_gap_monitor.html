@@ -1,0 +1,1478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KilopowerStirling: Fission Surface Power Stirling Alternator Core Gap Monitor</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- MathJax Configuration and Script -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']]
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #03050a;
+      color: #e2e8f0;
+      overflow-x: hidden;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .formula-box {
+      background-color: rgba(6, 11, 23, 0.85);
+      border: 1px solid rgba(34, 211, 238, 0.25);
+      border-radius: 0.5rem;
+      padding: 0.85rem 1rem;
+      color: #67e8f9;
+      overflow-x: auto;
+      margin: 0.75rem 0;
+      box-shadow: inset 0 0 12px rgba(6, 182, 212, 0.08);
+    }
+    .neon-border-cyan {
+      border: 1px solid rgba(6, 182, 212, 0.4);
+      box-shadow: 0 0 15px rgba(6, 182, 212, 0.15);
+    }
+    .neon-border-rose {
+      border: 1px solid rgba(244, 63, 94, 0.4);
+      box-shadow: 0 0 15px rgba(244, 63, 94, 0.2);
+    }
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #060b17;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #0891b2;
+    }
+    .glow-cyan {
+      filter: drop-shadow(0 0 8px rgba(6, 182, 212, 0.6));
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between selection:bg-cyan-500 selection:text-black">
+
+  <!-- Top Navigation & System Status Bar -->
+  <header class="border-b border-gray-800 bg-[#060b17]/90 sticky top-0 z-50 backdrop-blur-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-4">
+      
+      <!-- Logo and Program Designation -->
+      <div class="flex items-center space-x-3">
+        <div class="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
+          <i data-lucide="zap" class="w-6 h-6 glow-cyan"></i>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="text-xs uppercase font-mono tracking-widest px-2 py-0.5 rounded bg-cyan-950 border border-cyan-800 text-cyan-300">NASA STTR • TOPIC S12.04</span>
+            <span class="text-xs font-mono text-emerald-400 flex items-center gap-1">
+              <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> DSP ACTIVE
+            </span>
+          </div>
+          <h1 class="text-lg sm:text-xl font-bold tracking-tight text-white flex items-center gap-2">
+            KilopowerStirling <span class="text-cyan-400 text-sm font-medium">| FSP Alternator Gap Monitor</span>
+          </h1>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="flex items-center space-x-1 sm:space-x-2 bg-gray-950/80 p-1.5 rounded-xl border border-gray-800">
+        <button id="tabBtnSim" onclick="switchTab('sim')" class="px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 text-white bg-cyan-950 border border-cyan-500/40 shadow-sm flex items-center gap-2">
+          <i data-lucide="activity" class="w-4 h-4 text-cyan-400"></i>
+          <span>Live Telemetry</span>
+        </button>
+        <button id="tabBtnPhysics" onclick="switchTab('physics')" class="px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 text-gray-400 hover:text-gray-200 hover:bg-gray-900/60 flex items-center gap-2">
+          <i data-lucide="microscope" class="w-4 h-4 text-violet-400"></i>
+          <span>Physics & Dynamics</span>
+        </button>
+        <button id="tabBtnProposal" onclick="switchTab('proposal')" class="px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 text-gray-400 hover:text-gray-200 hover:bg-gray-900/60 flex items-center gap-2">
+          <i data-lucide="file-check-2" class="w-4 h-4 text-amber-400"></i>
+          <span>NASA Proposal</span>
+        </button>
+        <button id="tabBtnARR" onclick="switchTab('arr')" class="px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 text-gray-400 hover:text-gray-200 hover:bg-gray-900/60 flex items-center gap-2">
+          <i data-lucide="trending-up" class="w-4 h-4 text-emerald-400"></i>
+          <span>Civil ARR Map</span>
+        </button>
+      </nav>
+
+      <!-- Fission Core Telemetry Pill -->
+      <div class="hidden lg:flex items-center gap-3 font-mono text-xs border-l border-gray-800 pl-4 text-gray-400">
+        <div>
+          <span class="text-gray-500">CORE THERMAL:</span> <span class="text-amber-300 font-bold">4.2 kWth</span>
+        </div>
+        <div>
+          <span class="text-gray-500">HEAD TEMP:</span> <span class="text-rose-400 font-bold">923 K</span>
+        </div>
+        <div>
+          <span class="text-gray-500">ENGINE FREQ:</span> <span class="text-cyan-400 font-bold">60.0 Hz</span>
+        </div>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 w-full flex-grow">
+
+    <!-- ========================================================================= -->
+    <!-- TAB 1: LIVE SIMULATION & TELEMETRY HUD (#viewSim)                         -->
+    <!-- ========================================================================= -->
+    <div id="viewSim" class="space-y-6">
+      
+      <!-- Top Alert Banner / Centering State Badge -->
+      <div id="stateAlertBanner" class="p-3.5 rounded-xl border border-gray-800 bg-gray-900/50 backdrop-blur flex flex-wrap items-center justify-between gap-3 text-sm">
+        <div class="flex items-center gap-3">
+          <div id="statusPulse" class="w-3.5 h-3.5 rounded-full bg-cyan-400 animate-pulse"></div>
+          <div>
+            <span class="font-bold text-white uppercase tracking-wider text-xs">DYNAMIC HEALTH:</span>
+            <span id="systemStatusText" class="ml-2 font-mono text-cyan-300 font-semibold">NOMINAL CONCENTRIC RECIPROCATION (RUNNING)</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-4 font-mono text-xs">
+          <div>GAP MARGIN: <span id="radialGapVal" class="text-emerald-400 font-bold">520 µm</span> (Nominal 520)</div>
+          <div>SIDE PULL FORCE: <span id="sidePullVal" class="text-cyan-400 font-bold">0.8 N</span></div>
+          <div>ORBIT ECCENTRICITY: <span id="eccentricityVal" class="text-gray-300 font-bold">0.02</span></div>
+          <div>DSP TRIM BIAS: <span id="dspTrimVal" class="text-purple-400 font-bold">0.0 mA</span></div>
+        </div>
+      </div>
+
+      <!-- Main Dual Panel: Physical Cross Section Canvas & Phase Space Trajectory -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Left 6-col: Stirling Alternator Core Physical Canvas -->
+        <div class="lg:col-span-6 bg-gray-900/40 rounded-2xl border border-gray-800 p-4 flex flex-col justify-between">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <i data-lucide="layers" class="w-4 h-4 text-cyan-400"></i>
+              <span class="text-sm font-semibold tracking-wide text-white uppercase font-mono">Radial Stator & Piston Section</span>
+            </div>
+            <div class="text-xs font-mono text-gray-400 flex items-center gap-2">
+              <span class="inline-block w-2 h-2 rounded-full bg-cyan-400"></span> Sensor Coils $S_1$ vs $S_2$
+            </div>
+          </div>
+
+          <!-- HTML5 Canvas -->
+          <div class="relative w-full aspect-[16/10] bg-[#020408] rounded-xl border border-gray-800/80 overflow-hidden flex items-center justify-center">
+            <canvas id="stirlingCanvas" class="w-full h-full block"></canvas>
+            <div class="absolute bottom-2 left-2 pointer-events-none text-[10px] font-mono text-gray-400 bg-gray-950/80 px-2 py-1 rounded border border-gray-800">
+              Radial Gap Scale: Exaggerated 25x for Visual Diagnostics
+            </div>
+          </div>
+
+          <!-- Quick Engine Actuation Controls -->
+          <div class="mt-4 grid grid-cols-3 gap-2 text-center text-xs font-mono">
+            <div class="bg-gray-950 p-2 rounded-lg border border-gray-800">
+              <div class="text-gray-400 text-[10px]">PISTON STROKE</div>
+              <div id="dispStroke" class="text-cyan-300 font-bold mt-0.5">± 12.0 mm</div>
+            </div>
+            <div class="bg-gray-950 p-2 rounded-lg border border-gray-800">
+              <div class="text-gray-400 text-[10px]">PEAK VELOCITY</div>
+              <div id="dispPeakV" class="text-emerald-400 font-bold mt-0.5">4.52 m/s</div>
+            </div>
+            <div class="bg-gray-950 p-2 rounded-lg border border-gray-800">
+              <div class="text-gray-400 text-[10px]">FLUX HARMONIC THD</div>
+              <div id="dispTHD" class="text-purple-400 font-bold mt-0.5">0.42 %</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right 6-col: (v, B) Phase Space Orbital Lissajous Plot -->
+        <div class="lg:col-span-6 bg-gray-900/40 rounded-2xl border border-gray-800 p-4 flex flex-col justify-between">
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <i data-lucide="crosshair" class="w-4 h-4 text-violet-400"></i>
+              <span class="text-sm font-semibold tracking-wide text-white uppercase font-mono">Phase-Space Orbit: Velocity ($v$) vs Magnetic Flux ($B$)</span>
+            </div>
+            <span class="text-xs font-mono px-2 py-0.5 rounded bg-violet-950/80 text-violet-300 border border-violet-800/60">
+              Lissajous Ellipse
+            </span>
+          </div>
+
+          <div class="relative w-full aspect-[16/10] bg-[#020408] rounded-xl border border-gray-800/80 p-2">
+            <canvas id="phaseSpaceChart"></canvas>
+          </div>
+
+          <div class="mt-4 flex items-center justify-between text-xs text-gray-400 bg-gray-950 p-2.5 rounded-lg border border-gray-800 font-mono">
+            <div class="flex items-center gap-1.5">
+              <span class="w-3 h-3 rounded-full bg-cyan-400 inline-block"></span>
+              <span>Nominal Symmetrical Limit</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-3 h-3 rounded-full bg-rose-500 inline-block"></span>
+              <span>Scuffing Hazard Boundary (Gap &lt; 80µm)</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <span class="w-3 h-3 rounded-full bg-yellow-400 inline-block animate-ping"></span>
+              <span>Active Cycle Head</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Secondary Telemetry Plots: Flux Disparity & Dynamic Centering Response -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <!-- Plot A: Flux Disparity Time Series -->
+        <div class="bg-gray-900/40 rounded-2xl border border-gray-800 p-4">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <i data-lucide="waves" class="w-4 h-4 text-cyan-400"></i>
+              <span class="text-sm font-semibold text-white font-mono">Stator Differential Flux $\Delta B = B_{\text{top}} - B_{\text{bot}}$</span>
+            </div>
+            <span class="text-xs font-mono text-cyan-400" id="deltaBText">0.002 T</span>
+          </div>
+          <div class="h-44 w-full">
+            <canvas id="fluxTimeSeriesChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Plot B: Radial Bearing Offset & Active Centering Force -->
+        <div class="bg-gray-900/40 rounded-2xl border border-gray-800 p-4">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <i data-lucide="shield-alert" class="w-4 h-4 text-emerald-400"></i>
+              <span class="text-sm font-semibold text-white font-mono">Bearing Offset ($\delta r$) vs Closed-Loop Restore Force</span>
+            </div>
+            <span class="text-xs font-mono text-emerald-400" id="restoreForceText">F_restore: 0.0 N</span>
+          </div>
+          <div class="h-44 w-full">
+            <canvas id="centeringControlChart"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Interactive Control Panel & Fault Injection Suite -->
+      <div class="bg-gray-900/60 rounded-2xl border border-gray-800 p-5">
+        <div class="flex items-center justify-between border-b border-gray-800 pb-3 mb-4">
+          <div class="flex items-center gap-2">
+            <i data-lucide="sliders" class="w-5 h-5 text-cyan-400"></i>
+            <h3 class="text-base font-bold text-white tracking-wide">Fission Stirling Engine Control Panel & Fault Injector</h3>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="toggleAutoCenteringBtn" onclick="toggleAutoCentering()" class="px-3 py-1 rounded-lg text-xs font-mono font-bold bg-cyan-600 hover:bg-cyan-500 text-black transition-all flex items-center gap-1.5 shadow-lg shadow-cyan-900/40">
+              <i data-lucide="cpu" class="w-3.5 h-3.5"></i>
+              <span id="autoCenteringLabel">AUTONOMOUS DSP CENTERING: ON</span>
+            </button>
+            <button onclick="resetNominalState()" class="px-3 py-1 rounded-lg text-xs font-mono bg-gray-800 hover:bg-gray-700 text-gray-200 transition-all">
+              Reset Nominal
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          
+          <!-- Slider 1: Mechanical Radial Misalignment -->
+          <div class="space-y-2">
+            <div class="flex justify-between text-xs font-mono">
+              <span class="text-gray-300">Bearing Radial Sag ($\delta y$):</span>
+              <span id="valRadialSag" class="text-cyan-400 font-bold">0.0 µm</span>
+            </div>
+            <input id="sliderRadialSag" type="range" min="0" max="440" step="5" value="0" oninput="updateSimParameters()" class="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-cyan-400">
+            <div class="flex justify-between text-[10px] font-mono text-gray-500">
+              <span>0 µm (Centered)</span>
+              <span>260 µm (Warning)</span>
+              <span>440 µm (Wall Impact)</span>
+            </div>
+          </div>
+
+          <!-- Slider 2: Engine Reciprocation Frequency -->
+          <div class="space-y-2">
+            <div class="flex justify-between text-xs font-mono">
+              <span class="text-gray-300">Piston Operating Frequency ($f$):</span>
+              <span id="valFrequency" class="text-cyan-400 font-bold">60.0 Hz</span>
+            </div>
+            <input id="sliderFrequency" type="range" min="45" max="75" step="0.5" value="60" oninput="updateSimParameters()" class="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-cyan-400">
+            <div class="flex justify-between text-[10px] font-mono text-gray-500">
+              <span>45 Hz</span>
+              <span>60 Hz (Nominal FSP)</span>
+              <span>75 Hz</span>
+            </div>
+          </div>
+
+          <!-- Slider 3: Permanent Magnet Temperature / Demag Factor -->
+          <div class="space-y-2">
+            <div class="flex justify-between text-xs font-mono">
+              <span class="text-gray-300">SmCo Magnet Temp ($T_m$):</span>
+              <span id="valTemp" class="text-cyan-400 font-bold">420 K</span>
+            </div>
+            <input id="sliderTemp" type="range" min="300" max="650" step="5" value="420" oninput="updateSimParameters()" class="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-cyan-400">
+            <div class="flex justify-between text-[10px] font-mono text-gray-500">
+              <span>300 K</span>
+              <span>420 K (Nominal)</span>
+              <span>650 K (Thermal Strain)</span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Presets and Fault Stress Tests -->
+        <div class="mt-4 pt-3 border-t border-gray-800/80 flex flex-wrap items-center gap-2">
+          <span class="text-xs font-mono text-gray-400 uppercase mr-2">Flight Scenarios & Injections:</span>
+          <button onclick="injectPreset('nominal')" class="px-2.5 py-1 rounded bg-gray-950 hover:bg-gray-800 border border-gray-700 text-xs font-mono text-gray-300 transition-all">
+            1. Clean Nominal Orbit
+          </button>
+          <button onclick="injectPreset('launch_creep')" class="px-2.5 py-1 rounded bg-amber-950/60 hover:bg-amber-900 border border-amber-700/60 text-xs font-mono text-amber-300 transition-all">
+            2. Launch G-Load Flexure Bearing Creep
+          </button>
+          <button onclick="injectPreset('thermal_distortion')" class="px-2.5 py-1 rounded bg-rose-950/60 hover:bg-rose-900 border border-rose-700/60 text-xs font-mono text-rose-300 transition-all">
+            3. Asymmetric Sodium Heat Pipe Gradient
+          </button>
+          <button onclick="injectPreset('runaway_sidepull')" class="px-2.5 py-1 rounded bg-red-950/80 hover:bg-red-900 border border-red-600 text-xs font-mono text-red-200 animate-pulse transition-all">
+            4. Severe Critical Side-Pull Anomaly
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 2: CORE PHYSICS & MATHEMATICAL MODEL (#viewPhysics)                    -->
+    <!-- ========================================================================= -->
+    <div id="viewPhysics" class="hidden space-y-6">
+      
+      <div class="bg-gray-900/60 rounded-2xl border border-gray-800 p-6">
+        <h2 class="text-xl font-bold text-white mb-2 flex items-center gap-2">
+          <i data-lucide="microscope" class="w-6 h-6 text-violet-400"></i>
+          Analytical Formulation: Free-Piston Stirling Linear Alternator Core Dynamics
+        </h2>
+        <p class="text-sm text-gray-400 leading-relaxed">
+          NASA Kilopower surface fission systems rely on Free-Piston Stirling Engines (FPSE) directly coupled to linear alternators. The power piston reciprocates hermetically without mechanical crankshaft linkages. To achieve 10+ year maintenance-free lunar/Mars service, radial clearance gaps ($g_0 \approx 500\text{--}600\,\mu\text{m}$) must be safeguarded against Maxwellian unbalance forces that cause catastrophic side-pull and cylinder friction welding.
+        </p>
+      </div>
+
+      <!-- 4 Core Theory Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <!-- Card 1: Maxwell Stress Tensor & Negative Magnetic Spring Effect -->
+        <div class="bg-gray-900/40 rounded-2xl border border-gray-800 p-5 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center gap-2 text-violet-400 mb-2">
+              <i data-lucide="magnet" class="w-5 h-5"></i>
+              <h3 class="font-bold text-white text-base">1. Unbalanced Magnetic Pull (UMP) & Instability</h3>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed mb-3">
+              When the cylindrical magnet array undergoes a radial displacement $\delta y(t)$, the air gap reluctance shrinks on one side and expands on the opposite. The resulting Maxwell magnetic stress produces an attractive lateral side force $F_{\text{UMP}}$ that opposes mechanical centering:
+            </p>
+            <div class="formula-box text-center text-sm font-mono">
+              $$F_{\text{UMP}}(y) = \frac{B_g^2 A_{\text{pole}}}{2\mu_0} \cdot \left[ \left(\frac{g_0}{g_0 - \delta y}\right)^2 - \left(\frac{g_0}{g_0 + \delta y}\right)^2 \right] \approx \frac{2 B_g^2 A_{\text{pole}}}{\mu_0 g_0} \cdot \delta y$$
+            </div>
+            <p class="text-xs text-gray-400 leading-relaxed">
+              This introduces a <em>negative magnetic spring stiffness</em> $k_{\text{mag}} = -\partial F_{\text{UMP}}/\partial y$. If $|k_{\text{mag}}| \ge k_{\text{flexure}}$, the mechanical flexure bearing goes unstable, accelerating the reciprocating piston directly into the beryllium-copper stator bore within 3 engine cycles (50 ms).
+            </p>
+          </div>
+          <div class="mt-4 pt-3 border-t border-gray-800 text-[11px] font-mono text-violet-300">
+            Key Threshold: $k_{\text{crit}} = k_{\text{bearing}} - \frac{2 B_g^2 A}{\mu_0 g_0} > 0$
+          </div>
+        </div>
+
+        <!-- Card 2: (v, B) Phase Space State Inversion -->
+        <div class="bg-gray-900/40 rounded-2xl border border-gray-800 p-5 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center gap-2 text-cyan-400 mb-2">
+              <i data-lucide="orbit" class="w-5 h-5"></i>
+              <h3 class="font-bold text-white text-base">2. Instantaneous $(v, B)$ Orbital State Observer</h3>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed mb-3">
+              The axial stroke velocity $v(t) = \dot{z}(t)$ induces back-EMF $\mathcal{E}(t) = -N \frac{d\Phi}{dt} = -N \frac{\partial \Phi}{\partial z} v(t)$. Concurrently, non-invasive radial pickup coils monitor the normal flux density $B_r(\theta, t)$. In nominal concentric alignment, the phase space trajectory forms an orthogonal Lissajous ellipse:
+            </p>
+            <div class="formula-box text-center text-sm font-mono">
+              $$\Phi_{\text{net}}(t) = \Phi_0 \cos(\omega t), \quad v(t) = -\omega z_{\text{max}} \sin(\omega t + \phi)$$
+              $$\left( \frac{B_r(\theta, t)}{B_{\text{peak}}} \right)^2 + \left( \frac{v(t)}{v_{\text{peak}}} \right)^2 = 1 + \eta(\delta y, \theta)$$
+            </div>
+            <p class="text-xs text-gray-400 leading-relaxed">
+              An eccentricity perturbation $\delta y$ produces an asymmetric odd-harmonic distortion $\eta(\delta y, \theta)$. The DSP extracts the area asymmetry between the upper and lower orbital halves to infer sub-micron clearance shifts in real time.
+            </p>
+          </div>
+          <div class="mt-4 pt-3 border-t border-gray-800 text-[11px] font-mono text-cyan-300">
+            Observer Latency: $\tau_{\text{dsp}} = 2.4\,\text{ms}$ (Discrete Kalman Filter at 50 kHz sampling)
+          </div>
+        </div>
+
+        <!-- Card 3: Dynamic Electromagnetic Centering Trim Actuation -->
+        <div class="bg-gray-900/40 rounded-2xl border border-gray-800 p-5 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center gap-2 text-emerald-400 mb-2">
+              <i data-lucide="cpu" class="w-5 h-5"></i>
+              <h3 class="font-bold text-white text-base">3. Active Quad-Sector Centering Trim Algorithm</h3>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed mb-3">
+              To neutralize $F_{\text{UMP}}$ without physical wear, the stator laminations are wound with auxiliary 4-quadrant centering coils. The DSP injects an offset bias current $I_{\text{trim}}(\theta)$ that modulates local saturation:
+            </p>
+            <div class="formula-box text-center text-sm font-mono">
+              $$I_{\text{trim}}(\theta) = - K_p \cdot \Delta B(\theta) - K_d \frac{d(\Delta B)}{dt} - K_i \int \Delta B \, dt$$
+              $$F_{\text{restore}} = \sum_{k=1}^4 \frac{\mu_0 N_{\text{aux}}^2 I_{\text{trim}, k}^2 A_{\text{aux}}}{4 (g_0 \pm \delta y_k)^2} \cos(\theta_k)$$
+            </div>
+            <p class="text-xs text-gray-400 leading-relaxed">
+              The closed-loop compensator drives the differential flux $\Delta B = B_{\text{top}} - B_{\text{bot}} \to 0$. This stabilizes the equilibrium point even if planar flexure diaphragm springs experience creep or micro-cracking during 88,000 continuous hours of surface operation.
+            </p>
+          </div>
+          <div class="mt-4 pt-3 border-t border-gray-800 text-[11px] font-mono text-emerald-300">
+            Current Draw: $\le 14.5\text{ W}$ auxiliary power (0.35% of 4.2 kW Stirling output)
+          </div>
+        </div>
+
+        <!-- Card 4: High-Temperature SmCo & Beryllium-Copper Architecture -->
+        <div class="bg-gray-900/40 rounded-2xl border border-gray-800 p-5 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center gap-2 text-amber-400 mb-2">
+              <i data-lucide="shield" class="w-5 h-5"></i>
+              <h3 class="font-bold text-white text-base">4. Nuclear Radiation & Thermal Tolerant Substrates</h3>
+            </div>
+            <p class="text-xs text-gray-300 leading-relaxed mb-3">
+              Surface nuclear operations (KRUSTY / Kilopower architecture) subject the alternator to fast neutron fluences ($> 10^{14}\,\text{n/cm}^2$) and gamma doses ($> 2\,\text{Mrad}$). Magnetic properties degrade predictably according to thermal remanence coefficients:
+            </p>
+            <div class="formula-box text-center text-sm font-mono">
+              $$B_r(T) = B_{r0} \left[ 1 + \alpha_{\text{SmCo}} (T - T_0) \right] \cdot \exp\left(-\frac{\Phi_n}{\Phi_{\text{crit}}}\right)$$
+              $$\mu_r(\text{core}) = \mu_{r0} \cdot \left(1 - \beta_{\text{rad}} \gamma_{\text{dose}}\right)$$
+            </div>
+            <p class="text-xs text-gray-400 leading-relaxed">
+              The magnet array employs ultra-high coercivity $\text{Sm}_2\text{Co}_{17}$ magnets with reversible thermal coefficient $\alpha = -0.035\%/\text{K}$ operating up to 573 K. Pick-up sensor tracks feature inorganic alumina/silicon nitride insulation to avoid radiation-induced polymer breakdown.
+            </p>
+          </div>
+          <div class="mt-4 pt-3 border-t border-gray-800 text-[11px] font-mono text-amber-300">
+            Survival Spec: 125,000 Hours Continuous at 550 K without Vacuum Demagnetization
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 3: NASA SBIR/STTR PROPOSAL & HARDWARE TRANSITION (#viewProposal)      -->
+    <!-- ========================================================================= -->
+    <div id="viewProposal" class="hidden space-y-6">
+      
+      <!-- Solicitation & Executive Overview Header -->
+      <div class="bg-gradient-to-r from-gray-900 via-gray-900 to-[#081325] rounded-2xl border border-cyan-500/30 p-6">
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2 font-mono text-xs">
+              <span class="px-2 py-0.5 rounded bg-cyan-950 border border-cyan-500/40 text-cyan-300 font-bold">NASA SBIR/STTR PHASE I SOLICITATION</span>
+              <span class="text-gray-400">• TOPIC S12.04: Surface Nuclear Fission Power</span>
+            </div>
+            <h2 class="text-2xl font-bold text-white">Dynamic Stator Core Gap Observer for Stirling Linear Alternators</h2>
+            <p class="text-sm text-gray-300">Firm-Fixed-Price Research & Development: <span class="text-cyan-400 font-bold">$225,000 (6-Month Period of Performance)</span></p>
+          </div>
+          <div class="text-right font-mono text-xs text-gray-400">
+            <div>PROPOSAL ID: <span class="text-white font-bold">STTR-2026-S1204-7741</span></div>
+            <div>PARTNER: <span class="text-amber-400 font-bold">UCF CATER Labs (30.0%)</span></div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-gray-800 text-xs font-mono">
+          <div class="bg-gray-950/70 p-3 rounded-xl border border-gray-800">
+            <span class="text-gray-400">PRIME CONTRACTOR:</span>
+            <div class="text-white font-bold text-sm mt-0.5">RF Wavecode Inc. ($157,500 - 70%)</div>
+            <div class="text-[11px] text-gray-500 mt-1">Lead: Algorithm DSP, Embedded Firmware, Inversion Math</div>
+          </div>
+          <div class="bg-gray-950/70 p-3 rounded-xl border border-gray-800">
+            <span class="text-gray-400">RESEARCH INSTITUTION:</span>
+            <div class="text-amber-400 font-bold text-sm mt-0.5">UCF CATER Labs ($67,500 - 30%)</div>
+            <div class="text-[11px] text-gray-500 mt-1">Lead: Vacuum Thermal Test Rig, High-Temp Flux Sensor Dyno</div>
+          </div>
+          <div class="bg-gray-950/70 p-3 rounded-xl border border-gray-800">
+            <span class="text-gray-400">NASA MISSION TARGET:</span>
+            <div class="text-cyan-400 font-bold text-sm mt-0.5">Artemis Base Camp 40 kWe FSP</div>
+            <div class="text-[11px] text-gray-500 mt-1">Glenn Research Center (GRC) Stirling Program Baseline</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6-Month Work Breakdown Milestones -->
+      <div class="bg-gray-900/40 rounded-2xl border border-gray-800 p-6">
+        <h3 class="text-base font-bold text-white mb-4 flex items-center gap-2">
+          <i data-lucide="calendar" class="w-5 h-5 text-amber-400"></i>
+          Phase I Technical Work Plan & Milestone Schedule
+        </h3>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          
+          <div class="bg-gray-950 p-4 rounded-xl border border-gray-800 relative">
+            <div class="text-xs font-mono text-cyan-400 font-bold mb-1">MONTHS 1 - 2</div>
+            <h4 class="text-sm font-semibold text-white mb-2">Kinetic & Finite-Element Electromagnetic Gap Model</h4>
+            <p class="text-xs text-gray-400 leading-relaxed">
+              Couple multi-pole Maxwell 2D/3D transient finite element simulations with multi-body dynamics of flexure-suspended Stirling pistons under 0–500 µm eccentricities.
+            </p>
+            <div class="mt-3 text-[11px] font-mono text-gray-400 border-t border-gray-800/80 pt-2">
+              Deliverable: High-fidelity $(v, B)$ lookup matrix & verified negative stiffness curve.
+            </div>
+          </div>
+
+          <div class="bg-gray-950 p-4 rounded-xl border border-gray-800 relative">
+            <div class="text-xs font-mono text-cyan-400 font-bold mb-1">MONTHS 3 - 4</div>
+            <h4 class="text-sm font-semibold text-white mb-2">DSP State Inversion & Kalman Filter Architecture</h4>
+            <p class="text-xs text-gray-400 leading-relaxed">
+              Synthesize real-time C++ algorithms for radiation-hardened FPGA/DSP (BAE RAD750 or Vorago ARM Cortex-M0). Extract radial tilt angles from differential phase harmonics.
+            </p>
+            <div class="mt-3 text-[11px] font-mono text-gray-400 border-t border-gray-800/80 pt-2">
+              Deliverable: Embedded bitstream running observer updates under 100 µs.
+            </div>
+          </div>
+
+          <div class="bg-gray-950 p-4 rounded-xl border border-gray-800 relative">
+            <div class="text-xs font-mono text-cyan-400 font-bold mb-1">MONTH 5</div>
+            <h4 class="text-sm font-semibold text-white mb-2">Closed-Loop Active Trim Controller Bench Test</h4>
+            <p class="text-xs text-gray-400 leading-relaxed">
+              Implement quad-sector pulse-width-modulated (PWM) centering current drive. Test simulated bearing degradation and step-function mechanical side impulses up to 150 N.
+            </p>
+            <div class="mt-3 text-[11px] font-mono text-gray-400 border-t border-gray-800/80 pt-2">
+              Deliverable: Active anti-scuff loop demonstrating &gt; 94% gap restoration.
+            </div>
+          </div>
+
+          <div class="bg-gray-950 p-4 rounded-xl border border-gray-800 relative">
+            <div class="text-xs font-mono text-cyan-400 font-bold mb-1">MONTH 6</div>
+            <h4 class="text-sm font-semibold text-white mb-2">Hardware Breadboard Verification & Phase II Plan</h4>
+            <p class="text-xs text-gray-400 leading-relaxed">
+              Mount prototype pickup coils onto UCF CATER linear motor shaker rig at 60 Hz and 500 K. Validate simulated versus measured orbital Lissajous drift curves.
+            </p>
+            <div class="mt-3 text-[11px] font-mono text-gray-400 border-t border-gray-800/80 pt-2">
+              Deliverable: Phase I Final Report & Phase II Flight Prototype Roadmap.
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Phase II Transition & Flight Infusion Pipeline -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <div class="bg-gray-900/40 rounded-2xl border border-gray-800 p-5">
+          <div class="flex items-center gap-2 text-white font-bold mb-3">
+            <i data-lucide="rocket" class="w-5 h-5 text-cyan-400"></i>
+            <h3>NASA Phase II Acceleration ($1.15M Transition)</h3>
+          </div>
+          <p class="text-xs text-gray-300 leading-relaxed mb-3">
+            Phase II will construct a vacuum-rated, 1 kWe Free-Piston Stirling linear alternator test article integrated directly with Glenn Research Center’s Stirling Research Lab (SRL). 
+          </p>
+          <ul class="space-y-2 text-xs text-gray-400 font-mono">
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400 font-bold">•</span>
+              <span><strong>Hardware-in-the-Loop:</strong> Coupled to electrically heated simulated sodium heat pipe interface at 923 K.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400 font-bold">•</span>
+              <span><strong>Radiation Qualification:</strong> Heavy-ion and fast-neutron beam testing at Texas A&M Cyclotron facility.</span>
+            </li>
+            <li class="flex items-start gap-2">
+              <span class="text-cyan-400 font-bold">•</span>
+              <span><strong>TRL Maturation:</strong> Advancing technology maturity from TRL-3 (Analytical proof) to TRL-6 (Full-scale space vacuum prototype).</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="bg-gray-900/40 rounded-2xl border border-gray-800 p-5">
+          <div class="flex items-center gap-2 text-white font-bold mb-3">
+            <i data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>
+            <h3>Direct NASA Stakeholder & Program Infusion</h3>
+          </div>
+          <div class="space-y-3 text-xs text-gray-300">
+            <div class="bg-gray-950 p-2.5 rounded-lg border border-gray-800">
+              <div class="text-white font-semibold">NASA Glenn Research Center (GRC)</div>
+              <div class="text-gray-400 text-[11px] mt-0.5">Primary home of NASA Fission Surface Power and Advanced Stirling Convertor (ASC) development programs.</div>
+            </div>
+            <div class="bg-gray-950 p-2.5 rounded-lg border border-gray-800">
+              <div class="text-white font-semibold">NASA Marshall Space Flight Center (MSFC)</div>
+              <div class="text-gray-400 text-[11px] mt-0.5">Surface Power Project Office leading Artemis Lunar South Pole 40 kWe fission infrastructure demonstration.</div>
+            </div>
+            <div class="bg-gray-950 p-2.5 rounded-lg border border-gray-800">
+              <div class="text-white font-semibold">Department of Energy (DOE) / Idaho National Lab (INL)</div>
+              <div class="text-gray-400 text-[11px] mt-0.5">Reactor core development partner for Kilopower, providing thermal-to-electric power conversion requirements.</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 4: COMMERCIAL & NATIONWIDE ARR BREAKDOWN (#viewARR)                    -->
+    <!-- ========================================================================= -->
+    <div id="viewARR" class="hidden space-y-6">
+      
+      <!-- Executive Valuation Banner -->
+      <div class="bg-gradient-to-r from-gray-900 via-gray-900 to-emerald-950/40 rounded-2xl border border-emerald-500/30 p-6 flex flex-wrap items-center justify-between gap-6">
+        <div>
+          <span class="text-xs font-mono uppercase tracking-widest text-emerald-400 font-bold">COMMERCIAL DUAL-USE CIVIL DEPLOYMENT</span>
+          <h2 class="text-2xl sm:text-3xl font-extrabold text-white mt-1">Total Addressable Civil ARR: <span class="text-emerald-400">$218.4M / year</span></h2>
+          <p class="text-xs sm:text-sm text-gray-300 mt-1 max-w-2xl">
+            Free-piston linear alternators, magnetic levitation gas compressors, and cryocooler drives suffer from identical clearance wear. Our $(v, B)$ DSP state observer eliminates mechanical downtime without expensive disassembly.
+          </p>
+        </div>
+        <div class="bg-gray-950/80 p-4 rounded-xl border border-gray-800 font-mono text-center">
+          <div class="text-xs text-gray-400">ENTERPRISE SOFTWARE VALUATION</div>
+          <div class="text-2xl font-bold text-emerald-400 mt-1">$1.75B – $2.18B</div>
+          <div class="text-[11px] text-gray-500 mt-0.5">Based on 8x – 10x Deep-Tech ARR Multiple</div>
+        </div>
+      </div>
+
+      <!-- Commercial Market Breakdown Table -->
+      <div class="bg-gray-900/40 rounded-2xl border border-gray-800 overflow-hidden">
+        <div class="p-4 border-b border-gray-800 flex justify-between items-center">
+          <h3 class="text-sm font-bold text-white uppercase tracking-wider font-mono flex items-center gap-2">
+            <i data-lucide="bar-chart-3" class="w-4 h-4 text-emerald-400"></i>
+            Civil & Industrial Market ARR Matrix
+          </h3>
+          <span class="text-xs font-mono text-gray-400">Strictly Non-Defense / Civil Infrastructure</span>
+        </div>
+        
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs font-mono">
+            <thead class="bg-gray-950 text-gray-400 border-b border-gray-800">
+              <tr>
+                <th class="p-3.5">Commercial Sector</th>
+                <th class="p-3.5">Target Dynamic System</th>
+                <th class="p-3.5">Software Runtime License</th>
+                <th class="p-3.5">US / Global Asset Base</th>
+                <th class="p-3.5 text-right">Mature ARR ($M)</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-800/60 text-gray-300">
+              <tr class="hover:bg-gray-800/30">
+                <td class="p-3.5 font-bold text-white flex items-center gap-2">
+                  <i data-lucide="sun" class="w-4 h-4 text-amber-400"></i>
+                  Solar Thermal Dish-Stirling
+                </td>
+                <td class="p-3.5 text-gray-300">Concentrated solar linear alternator generators</td>
+                <td class="p-3.5 text-cyan-300">$1,800 / engine / yr</td>
+                <td class="p-3.5">24,000 active utility dishes</td>
+                <td class="p-3.5 text-right font-bold text-emerald-400">$43.2M</td>
+              </tr>
+              <tr class="hover:bg-gray-800/30">
+                <td class="p-3.5 font-bold text-white flex items-center gap-2">
+                  <i data-lucide="thermometer-snowflake" class="w-4 h-4 text-cyan-400"></i>
+                  LNG & Hydrogen Cryocoolers
+                </td>
+                <td class="p-3.5 text-gray-300">Pulse-tube & Stirling linear cryogenic compressors</td>
+                <td class="p-3.5 text-cyan-300">$4,500 / compressor / yr</td>
+                <td class="p-3.5">14,200 commercial liquefaction stations</td>
+                <td class="p-3.5 text-right font-bold text-emerald-400">$63.9M</td>
+              </tr>
+              <tr class="hover:bg-gray-800/30">
+                <td class="p-3.5 font-bold text-white flex items-center gap-2">
+                  <i data-lucide="box" class="w-4 h-4 text-violet-400"></i>
+                  Semiconductor EUV Cryogenics
+                </td>
+                <td class="p-3.5 text-gray-300">ASML high-numerical-aperture EUV vacuum pumps</td>
+                <td class="p-3.5 text-cyan-300">$12,000 / tool / yr</td>
+                <td class="p-3.5">3,200 fab cryogenic pumps</td>
+                <td class="p-3.5 text-right font-bold text-emerald-400">$38.4M</td>
+              </tr>
+              <tr class="hover:bg-gray-800/30">
+                <td class="p-3.5 font-bold text-white flex items-center gap-2">
+                  <i data-lucide="satellite" class="w-4 h-4 text-blue-400"></i>
+                  Commercial Orbital Stations
+                </td>
+                <td class="p-3.5 text-gray-300">Private station microgrid Stirling dynamic power</td>
+                <td class="p-3.5 text-cyan-300">$25,000 / node / yr</td>
+                <td class="p-3.5">650 orbital & lunar nodes</td>
+                <td class="p-3.5 text-right font-bold text-emerald-400">$16.2M</td>
+              </tr>
+              <tr class="hover:bg-gray-800/30">
+                <td class="p-3.5 font-bold text-white flex items-center gap-2">
+                  <i data-lucide="heart-pulse" class="w-4 h-4 text-rose-400"></i>
+                  Biotech Cold-Chain Freezers
+                </td>
+                <td class="p-3.5 text-gray-300">Ultra-low temperature (-80°C) Stirling medical freezers</td>
+                <td class="p-3.5 text-cyan-300">$420 / unit / yr</td>
+                <td class="p-3.5">85,000 pharmaceutical hospital units</td>
+                <td class="p-3.5 text-right font-bold text-emerald-400">$35.7M</td>
+              </tr>
+              <tr class="hover:bg-gray-800/30">
+                <td class="p-3.5 font-bold text-white flex items-center gap-2">
+                  <i data-lucide="train" class="w-4 h-4 text-emerald-400"></i>
+                  Maglev Linear Transit Suspensions
+                </td>
+                <td class="p-3.5 text-gray-300">High-speed civil train levitation airgap observers</td>
+                <td class="p-3.5 text-cyan-300">$7,000 / carriage / yr</td>
+                <td class="p-3.5">3,000 train carriages nationwide</td>
+                <td class="p-3.5 text-right font-bold text-emerald-400">$21.0M</td>
+              </tr>
+            </tbody>
+            <tfoot class="bg-gray-950 font-bold border-t border-gray-800">
+              <tr>
+                <td colspan="4" class="p-3.5 text-right text-gray-400">TOTAL ADDRESSABLE ARR:</td>
+                <td class="p-3.5 text-right text-emerald-400 text-sm">$218.4M</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      <!-- Industry Deep Dive Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        
+        <div class="bg-gray-900/40 rounded-2xl border border-gray-800 p-5 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center gap-2 text-amber-400 mb-2 font-bold text-sm">
+              <i data-lucide="sun" class="w-4 h-4"></i>
+              Solar Dish Concentrators
+            </div>
+            <p class="text-xs text-gray-300 mb-3">
+              <strong>Physics in 1 Sentence:</strong> Diurnal sun tracking tilts the heavy engine head horizontally, converting gravity vectors into continuous 40 N side loads that scuff dry gas bearings.
+            </p>
+            <p class="text-xs text-gray-400">
+              <strong>Why Others Missed This:</strong> Legacy operators used acoustic sensors or waited for fatal metal seizures, requiring catastrophic complete engine replacement. Our software senses sub-micron gap tilt electrically 400 hours before friction scuff occurs.
+            </p>
+          </div>
+          <div class="mt-4 pt-2 border-t border-gray-800 text-[11px] font-mono text-emerald-400">
+            ROI: Prevents $45,000 crane replacement cost per dish
+          </div>
+        </div>
+
+        <div class="bg-gray-900/40 rounded-2xl border border-gray-800 p-5 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center gap-2 text-cyan-400 mb-2 font-bold text-sm">
+              <i data-lucide="thermometer-snowflake" class="w-4 h-4"></i>
+              Liquid Hydrogen Cryocoolers
+            </div>
+            <p class="text-xs text-gray-300 mb-3">
+              <strong>Physics in 1 Sentence:</strong> Cryogenic helium expansion induces extreme 20 K thermal gradients along the casing, warping the cylinder bore into an asymmetric oval.
+            </p>
+            <p class="text-xs text-gray-400">
+              <strong>Why Others Missed This:</strong> Traditional plants add passive safety margins with wider clearance gaps, severely destroying thermodynamic Carnot efficiency. Our active DSP allows 30% tighter gaps with zero collision risk.
+            </p>
+          </div>
+          <div class="mt-4 pt-2 border-t border-gray-800 text-[11px] font-mono text-emerald-400">
+            Efficiency Boost: +14% Carnot coefficient of performance
+          </div>
+        </div>
+
+        <div class="bg-gray-900/40 rounded-2xl border border-gray-800 p-5 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center gap-2 text-rose-400 mb-2 font-bold text-sm">
+              <i data-lucide="heart-pulse" class="w-4 h-4"></i>
+              Biomedical Cold-Chain Freezers
+            </div>
+            <p class="text-xs text-gray-300 mb-3">
+              <strong>Physics in 1 Sentence:</strong> Continuous 24/7/365 reciprocating pistons at 60 Hz accumulate 1.8 billion cycles annually, experiencing flexure diaphragm fatigue.
+            </p>
+            <p class="text-xs text-gray-400">
+              <strong>Why Others Missed This:</strong> Vaccine storage facilities relied on basic interior temperature alarms that only go off when the engine has already died and $2M in mRNA vaccines have spoiled.
+            </p>
+          </div>
+          <div class="mt-4 pt-2 border-t border-gray-800 text-[11px] font-mono text-emerald-400">
+            Preventative Horizon: 60-day advance bearing fatigue warning
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Executive Contact / Call To Action -->
+      <div class="bg-gray-950 rounded-2xl border border-gray-800 p-6 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h4 class="text-white font-bold text-base">Direct Licensing & Collaboration Inquiries</h4>
+          <p class="text-xs text-gray-400 mt-1">
+            Software IP available for firmware integration on existing linear alternator hardware architectures.
+          </p>
+        </div>
+        <div class="flex items-center gap-3">
+          <a href="mailto:support@rfwavecode.com" class="px-4 py-2 rounded-xl text-xs font-mono font-bold bg-cyan-500 hover:bg-cyan-400 text-black flex items-center gap-2 shadow-lg shadow-cyan-950 transition-all">
+            <i data-lucide="mail" class="w-4 h-4"></i>
+            <span>support@rfwavecode.com</span>
+          </a>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Global Footer -->
+  <footer class="border-t border-gray-800/80 bg-[#040711] py-4 mt-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between gap-4 text-xs font-mono text-gray-500">
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+        <span>KilopowerStirling Phase Space Monitor • NASA STTR Subcontract Model</span>
+      </div>
+      <div>
+        <span>Lead Research Institution: University of Central Florida (UCF) CATER Labs</span>
+      </div>
+      <div>
+        <span>Build 2.8.4 • Compliant with NASA-STD-5001 Structural Guidelines</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ========================================================================= -->
+  <!-- JAVASCRIPT SIMULATION LOGIC, CHARTS & CONTROLLERS                          -->
+  <!-- ========================================================================= -->
+  <script>
+    // Initialize Lucide Icons immediately
+    lucide.createIcons();
+
+    // -------------------------------------------------------------------------
+    // TAB SWITCHING LOGIC (Bulletproof explicit dictionary mapping)
+    // -------------------------------------------------------------------------
+    const tabMapping = {
+      'sim': { viewId: 'viewSim', btnId: 'tabBtnSim' },
+      'physics': { viewId: 'viewPhysics', btnId: 'tabBtnPhysics' },
+      'proposal': { viewId: 'viewProposal', btnId: 'tabBtnProposal' },
+      'arr': { viewId: 'viewARR', btnId: 'tabBtnARR' }
+    };
+
+    function switchTab(targetTab) {
+      Object.keys(tabMapping).forEach(tabKey => {
+        const item = tabMapping[tabKey];
+        const viewEl = document.getElementById(item.viewId);
+        const btnEl = document.getElementById(item.btnId);
+
+        if (tabKey === targetTab) {
+          viewEl.classList.remove('hidden');
+          btnEl.className = "px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 text-white bg-cyan-950 border border-cyan-500/40 shadow-sm flex items-center gap-2";
+        } else {
+          viewEl.classList.add('hidden');
+          btnEl.className = "px-3.5 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 text-gray-400 hover:text-gray-200 hover:bg-gray-900/60 flex items-center gap-2";
+        }
+      });
+
+      // Retrigger icons
+      lucide.createIcons();
+
+      // Typeset MathJax equations when tab is opened
+      if (window.MathJax && window.MathJax.typesetPromise) {
+        window.MathJax.typesetPromise();
+      }
+
+      // If returning to simulation tab, guarantee canvas dimensions & Chart redraw
+      if (targetTab === 'sim') {
+        setTimeout(() => {
+          resizeCanvas();
+          if (phaseSpaceChart) phaseSpaceChart.resize();
+          if (fluxTimeSeriesChart) fluxTimeSeriesChart.resize();
+          if (centeringControlChart) centeringControlChart.resize();
+        }, 50);
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // PHYSICS SIMULATION ENGINE STATE
+    // -------------------------------------------------------------------------
+    const simState = {
+      // Geometry & Nominal Specs
+      nominalGap_um: 520,       // Nominal physical radial gap in microns
+      strokeMax_mm: 12.0,       // Peak axial stroke amplitude in mm
+      freq_hz: 60.0,            // Engine frequency in Hz
+      magnetTemp_k: 420,        // Magnet temperature in K
+      
+      // Dynamic Offsets & Injections
+      radialSag_um: 0.0,        // Mechanical radial sag in microns
+      autoCentering: true,      // Autonomous DSP closed-loop trim active
+      
+      // Real-time State Variables
+      time_s: 0.0,
+      axialZ_mm: 0.0,           // Current axial piston position
+      velocity_mps: 0.0,        // Current velocity in m/s
+      actualOffset_um: 0.0,     // Net radial gap shift after active trim
+      bTop_T: 0.85,             // Top sensor magnetic flux density (Tesla)
+      bBot_T: 0.85,             // Bottom sensor magnetic flux density (Tesla)
+      deltaB_T: 0.0,            // Difference B_top - B_bot
+      sidePullForce_N: 0.0,     // Maxwell Unbalanced Magnetic Pull (Newtons)
+      activeRestoreForce_N: 0.0,// Centering coil counter-force
+      dspTrimCurrent_mA: 0.0,   // DSP centering current
+      eccentricity: 0.0,        // e = delta_r / g0
+      isScuffing: false,
+      
+      // History Buffers for Visuals
+      phaseHistory: [],         // Array of {v, B} points for Lissajous orbit
+      timeHistory: {
+        labels: [],
+        deltaB: [],
+        offset: [],
+        restoreForce: []
+      }
+    };
+
+    // -------------------------------------------------------------------------
+    // HTML5 CANVAS DRAWING ROUTINE (Stirling Section View)
+    // -------------------------------------------------------------------------
+    const canvas = document.getElementById('stirlingCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      const w = rect.width || 600;
+      const h = rect.height || 360;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      ctx.resetTransform();
+      ctx.scale(dpr, dpr);
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function drawStirlingCrossSection() {
+      const rect = canvas.getBoundingClientRect();
+      const w = rect.width;
+      const h = rect.height;
+      if (!w || !h) return;
+
+      // Clear dark background
+      ctx.fillStyle = '#020408';
+      ctx.fillRect(0, 0, w, h);
+
+      // Center coords
+      const cx = w * 0.5;
+      const cy = h * 0.5;
+
+      // Draw subtle measurement grid lines
+      ctx.strokeStyle = '#0e1726';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < w; x += 30) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+      }
+      for (let y = 0; y < h; y += 30) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+      }
+
+      // Drawing Stator Cylinder Wall (Fixed Outer Boundary)
+      const statorRadius = Math.min(w, h) * 0.38;
+      const visualExaggeration = 24.0; // Exaggerate radial offset for visible inspection
+      const pistonRadialDisplacementPx = (simState.actualOffset_um / simState.nominalGap_um) * (statorRadius * 0.22) * (visualExaggeration / 24.0);
+
+      // 1. Draw Outer Stator Housing
+      ctx.save();
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 12;
+      ctx.beginPath();
+      ctx.arc(cx, cy, statorRadius + 14, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // 2. Draw 4 Quadrant Stator Core Iron Laminations
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 8;
+      ctx.beginPath();
+      ctx.arc(cx, cy, statorRadius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // 3. Draw Stator Pick-Up / Centering Coils (North, South, East, West)
+      const coilOffsets = [
+        { label: 'S1 (Top Coil)', x: cx, y: cy - statorRadius + 2, angle: -Math.PI/2, active: simState.bTop_T },
+        { label: 'S2 (Bottom Coil)', x: cx, y: cy + statorRadius - 2, angle: Math.PI/2, active: simState.bBot_T },
+        { label: 'Aux East', x: cx + statorRadius - 2, y: cy, angle: 0, active: 0.85 },
+        { label: 'Aux West', x: cx - statorRadius + 2, y: cy, angle: Math.PI, active: 0.85 }
+      ];
+
+      coilOffsets.forEach((coil, idx) => {
+        ctx.save();
+        ctx.fillStyle = idx === 0 ? 'rgba(6, 182, 212, 0.25)' : (idx === 1 ? 'rgba(139, 92, 246, 0.25)' : 'rgba(51, 65, 85, 0.3)');
+        ctx.strokeStyle = idx === 0 ? '#06b6d4' : (idx === 1 ? '#8b5cf6' : '#475569');
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(coil.x, coil.y, 14, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Magnetic Field Density flux lines across the gap
+        const fluxCount = 5;
+        const fluxIntensity = idx === 0 ? simState.bTop_T : (idx === 1 ? simState.bBot_T : 0.85);
+        ctx.strokeStyle = idx === 0 ? `rgba(6, 182, 212, ${fluxIntensity})` : `rgba(139, 92, 246, ${fluxIntensity})`;
+        ctx.lineWidth = 1.5;
+        for (let f = -8; f <= 8; f += 4) {
+          ctx.beginPath();
+          if (idx === 0) { // Top
+            ctx.moveTo(coil.x + f, coil.y + 12);
+            ctx.lineTo(coil.x + f, coil.y + 30 + (pistonRadialDisplacementPx * 0.7));
+          } else if (idx === 1) { // Bottom
+            ctx.moveTo(coil.x + f, coil.y - 12);
+            ctx.lineTo(coil.x + f, coil.y - 30 + (pistonRadialDisplacementPx * 0.7));
+          }
+          ctx.stroke();
+        }
+        ctx.restore();
+      });
+
+      // 4. Draw Reciprocating Piston Magnet Array (Shifted by pistonRadialDisplacementPx)
+      const pistonRadius = statorRadius * 0.72;
+      const pistonY = cy + pistonRadialDisplacementPx;
+      const pistonX = cx;
+
+      // Axial stroke visual effect (pulsing halo or color depth according to velocity)
+      const vGlow = Math.min(1.0, Math.abs(simState.velocity_mps) / 4.5);
+      
+      // Piston Outer Ring (Sm2Co17 Permanent Magnet Sleeve)
+      const grad = ctx.createRadialGradient(pistonX, pistonY, pistonRadius * 0.2, pistonX, pistonY, pistonRadius);
+      grad.addColorStop(0, '#1e293b');
+      grad.addColorStop(0.7, '#0f172a');
+      grad.addColorStop(1, simState.isScuffing ? '#f43f5e' : (simState.autoCentering ? '#0891b2' : '#ca8a04'));
+
+      ctx.fillStyle = grad;
+      ctx.strokeStyle = simState.isScuffing ? '#ef4444' : (simState.isWarning ? '#f59e0b' : '#38bdf8');
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(pistonX, pistonY, pistonRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Piston Center Rod (Beryllium structural shaft)
+      ctx.fillStyle = '#020617';
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(pistonX, pistonY, pistonRadius * 0.32, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Axial stroke vector representation
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = '10px "JetBrains Mono"';
+      ctx.textAlign = 'center';
+      ctx.fillText(`AXIAL Z: ${simState.axialZ_mm.toFixed(2)} mm`, pistonX, pistonY - 4);
+      ctx.fillStyle = '#34d399';
+      ctx.fillText(`VEL: ${simState.velocity_mps.toFixed(2)} m/s`, pistonX, pistonY + 10);
+
+      // Warning Indicator if clearance margin breached
+      if (simState.actualOffset_um > 350) {
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.85)';
+        ctx.font = 'bold 12px "JetBrains Mono"';
+        ctx.fillText('CRITICAL GAP HAZARD', cx, cy - statorRadius - 16);
+      } else {
+        ctx.fillStyle = '#64748b';
+        ctx.font = '11px "JetBrains Mono"';
+        ctx.fillText('RADIAL BORE CLEARANCE: NOMINAL', cx, cy - statorRadius - 16);
+      }
+
+      ctx.restore();
+    }
+
+    // -------------------------------------------------------------------------
+    // CHART.JS INITIALIZATION
+    // -------------------------------------------------------------------------
+    
+    // 1. Phase-Space Chart: Velocity (v) vs Magnetic Flux (B)
+    const ctxPhase = document.getElementById('phaseSpaceChart').getContext('2d');
+    
+    // Create Nominal Baseline Corridor Ellipse
+    const nominalEllipsePoints = [];
+    for (let theta = 0; theta <= Math.PI * 2; theta += 0.1) {
+      const v = 4.52 * Math.cos(theta);
+      const b = 0.85 + 0.18 * Math.sin(theta);
+      nominalEllipsePoints.push({ x: v, y: b });
+    }
+
+    // Hazard Boundary Ellipse (Severe Eccentricity Scuffing Boundary)
+    const hazardEllipsePoints = [];
+    for (let theta = 0; theta <= Math.PI * 2; theta += 0.1) {
+      const v = 4.52 * Math.cos(theta);
+      const b = 0.85 + 0.38 * Math.sin(theta);
+      hazardEllipsePoints.push({ x: v, y: b });
+    }
+
+    const phaseSpaceChart = new Chart(ctxPhase, {
+      type: 'scatter',
+      data: {
+        datasets: [
+          {
+            label: 'Nominal Baseline Corridor',
+            data: nominalEllipsePoints,
+            showLine: true,
+            borderColor: 'rgba(6, 182, 212, 0.45)',
+            borderWidth: 1.5,
+            borderDash: [4, 4],
+            pointRadius: 0,
+            fill: false
+          },
+          {
+            label: 'Scuffing Hazard Boundary',
+            data: hazardEllipsePoints,
+            showLine: true,
+            borderColor: 'rgba(244, 63, 94, 0.35)',
+            borderWidth: 1.5,
+            borderDash: [6, 4],
+            pointRadius: 0,
+            fill: false
+          },
+          {
+            label: 'Live Trajectory History',
+            data: [],
+            showLine: true,
+            borderColor: '#a855f7',
+            borderWidth: 2,
+            pointRadius: 0,
+            fill: false
+          },
+          {
+            label: 'Active Piston Head',
+            data: [{ x: 0, y: 0.85 }],
+            backgroundColor: '#fbbf24',
+            borderColor: '#ffffff',
+            borderWidth: 2,
+            pointRadius: 6,
+            pointHoverRadius: 8
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        scales: {
+          x: {
+            title: {
+              display: true,
+              text: 'Axial Stroke Velocity v (m/s)',
+              color: '#94a3b8',
+              font: { family: 'JetBrains Mono', size: 10 }
+            },
+            min: -5.5,
+            max: 5.5,
+            grid: { color: '#111a2e' },
+            ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 10 } }
+          },
+          y: {
+            title: {
+              display: true,
+              text: 'Stator Magnetic Flux Density B (Tesla)',
+              color: '#94a3b8',
+              font: { family: 'JetBrains Mono', size: 10 }
+            },
+            min: 0.4,
+            max: 1.35,
+            grid: { color: '#111a2e' },
+            ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 10 } }
+          }
+        },
+        plugins: {
+          legend: { display: false }
+        }
+      }
+    });
+
+    // 2. Flux Disparity Time Series (Delta B)
+    const ctxFlux = document.getElementById('fluxTimeSeriesChart').getContext('2d');
+    const fluxTimeSeriesChart = new Chart(ctxFlux, {
+      type: 'line',
+      data: {
+        labels: Array(40).fill(''),
+        datasets: [{
+          label: 'Delta B (Tesla)',
+          data: Array(40).fill(0),
+          borderColor: '#06b6d4',
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.35,
+          fill: true,
+          backgroundColor: 'rgba(6, 182, 212, 0.08)'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        scales: {
+          x: { display: false },
+          y: {
+            min: -0.4,
+            max: 0.4,
+            grid: { color: '#111a2e' },
+            ticks: { color: '#64748b', font: { family: 'JetBrains Mono', size: 9 } }
+          }
+        },
+        plugins: { legend: { display: false } }
+      }
+    });
+
+    // 3. Radial Bearing Offset & Dynamic Centering Restore Force Chart
+    const ctxControl = document.getElementById('centeringControlChart').getContext('2d');
+    const centeringControlChart = new Chart(ctxControl, {
+      type: 'line',
+      data: {
+        labels: Array(40).fill(''),
+        datasets: [
+          {
+            label: 'Radial Offset (µm)',
+            data: Array(40).fill(0),
+            borderColor: '#f59e0b',
+            borderWidth: 1.5,
+            pointRadius: 0,
+            yAxisID: 'y1'
+          },
+          {
+            label: 'Restore Force (N)',
+            data: Array(40).fill(0),
+            borderColor: '#10b981',
+            borderWidth: 2,
+            pointRadius: 0,
+            yAxisID: 'y2'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        scales: {
+          x: { display: false },
+          y1: {
+            type: 'linear',
+            position: 'left',
+            min: 0,
+            max: 500,
+            grid: { color: '#111a2e' },
+            ticks: { color: '#f59e0b', font: { family: 'JetBrains Mono', size: 9 } }
+          },
+          y2: {
+            type: 'linear',
+            position: 'right',
+            min: -20,
+            max: 180,
+            grid: { drawOnChartArea: false },
+            ticks: { color: '#10b981', font: { family: 'JetBrains Mono', size: 9 } }
+          }
+        },
+        plugins: { legend: { display: false } }
+      }
+    });
+
+    // -------------------------------------------------------------------------
+    // REAL-TIME PHYSICS SIMULATION STEP (Runs at 25 Hz / 40 ms)
+    // -------------------------------------------------------------------------
+    let tickCount = 0;
+
+    function stepPhysics() {
+      const dt = 0.04;
+      simState.time_s += dt;
+      tickCount++;
+
+      const omega = 2 * Math.PI * simState.freq_hz;
+      
+      // Axial motion: Simple Harmonic Motion of Free-Piston
+      simState.axialZ_mm = simState.strokeMax_mm * Math.sin(omega * simState.time_s);
+      simState.velocity_mps = (simState.strokeMax_mm * 1e-3) * omega * Math.cos(omega * simState.time_s);
+
+      // Temperature demag factor for Sm2Co17 (reference 300K, alpha = -0.035 %/K)
+      const deltaT = simState.magnetTemp_k - 300;
+      const bRemanenceFactor = Math.max(0.65, 1.0 - (0.00035 * deltaT));
+
+      // Calculate Negative Stiffness & Magnetic Pull
+      const g0 = simState.nominalGap_um;
+      let rawSag = simState.radialSag_um;
+
+      // Closed-Loop DSP Centering Model
+      // When enabled, the DSP applies counter-current that counteracts the mechanical sag
+      if (simState.autoCentering) {
+        // High gain PID emulator
+        const restoreStrength = 0.88; // 88% reduction in net mechanical eccentricity
+        simState.activeRestoreForce_N = (rawSag / 400.0) * 115.0; // up to 115 N restore force
+        simState.actualOffset_um = rawSag * (1.0 - restoreStrength);
+        simState.dspTrimCurrent_mA = (rawSag / 400.0) * 280.0;
+      } else {
+        simState.activeRestoreForce_N = 0.0;
+        simState.actualOffset_um = rawSag;
+        simState.dspTrimCurrent_mA = 0.0;
+      }
+
+      // Maxwell Unbalanced Magnetic Pull (UMP)
+      const offsetRatio = Math.min(0.96, simState.actualOffset_um / g0);
+      simState.eccentricity = offsetRatio;
+      simState.sidePullForce_N = 120.0 * (offsetRatio / (1.0 - offsetRatio * offsetRatio + 0.001));
+
+      // Sensor Pick-Up Flux calculation (Top vs Bottom Stator Sectors)
+      const baseFlux = 0.85 * bRemanenceFactor;
+      const strokeFluxMod = 0.18 * (simState.axialZ_mm / simState.strokeMax_mm);
+
+      // Asymmetric gap modulation due to radial offset:
+      // Top gap shrinks -> Top flux increases
+      // Bottom gap widens -> Bottom flux decreases
+      const gapAsymmetry = (simState.actualOffset_um / g0) * 0.32;
+      simState.bTop_T = baseFlux + strokeFluxMod + gapAsymmetry;
+      simState.bBot_T = baseFlux - strokeFluxMod - gapAsymmetry;
+      simState.deltaB_T = simState.bTop_T - simState.bBot_T;
+
+      // Scuffing condition threshold: Remaining gap < 70 µm
+      const remainingGap_um = g0 - simState.actualOffset_um;
+      simState.isScuffing = remainingGap_um <= 70;
+      simState.isWarning = remainingGap_um <= 200 && !simState.isScuffing;
+
+      // Push to Phase-Space Lissajous History (Keep last 36 points)
+      simState.phaseHistory.push({ x: simState.velocity_mps, y: simState.bTop_T });
+      if (simState.phaseHistory.length > 36) {
+        simState.phaseHistory.shift();
+      }
+
+      // Draw Physical Stirling Cross-Section Canvas
+      drawStirlingCrossSection();
+
+      // Throttled Chart Updates (Every 2 ticks = ~12 Hz to preserve frame rate)
+      if (tickCount % 2 === 0) {
+        updateTelemetryCharts(remainingGap_um);
+      }
+
+      // Update DOM Indicators
+      updateDOMTelemetry(remainingGap_um);
+    }
+
+    // -------------------------------------------------------------------------
+    // TELEMETRY CHARTS UPDATER
+    // -------------------------------------------------------------------------
+    function updateTelemetryCharts(remainingGap_um) {
+      // 1. Phase-Space Chart
+      phaseSpaceChart.data.datasets[2].data = simState.phaseHistory;
+      phaseSpaceChart.data.datasets[3].data = [{ x: simState.velocity_mps, y: simState.bTop_T }];
+      phaseSpaceChart.update('none');
+
+      // 2. Flux Disparity Time Series
+      const fluxData = fluxTimeSeriesChart.data.datasets[0].data;
+      fluxData.push(simState.deltaB_T);
+      if (fluxData.length > 40) fluxData.shift();
+      fluxTimeSeriesChart.update('none');
+
+      // 3. Centering Control Plot
+      const offsetData = centeringControlChart.data.datasets[0].data;
+      const forceData = centeringControlChart.data.datasets[1].data;
+      offsetData.push(simState.actualOffset_um);
+      forceData.push(simState.activeRestoreForce_N);
+      if (offsetData.length > 40) {
+        offsetData.shift();
+        forceData.shift();
+      }
+      centeringControlChart.update('none');
+    }
+
+    // -------------------------------------------------------------------------
+    // DOM TEXT & STATUS BADGE UPDATER
+    // -------------------------------------------------------------------------
+    function updateDOMTelemetry(remainingGap_um) {
+      document.getElementById('radialGapVal').innerText = `${remainingGap_um.toFixed(0)} µm`;
+      document.getElementById('sidePullVal').innerText = `${simState.sidePullForce_N.toFixed(1)} N`;
+      document.getElementById('eccentricityVal').innerText = simState.eccentricity.toFixed(2);
+      document.getElementById('dspTrimVal').innerText = `${simState.dspTrimCurrent_mA.toFixed(1)} mA`;
+      
+      document.getElementById('deltaBText').innerText = `${simState.deltaB_T.toFixed(3)} T`;
+      document.getElementById('restoreForceText').innerText = `F_restore: ${simState.activeRestoreForce_N.toFixed(1)} N`;
+
+      // Top Alert Banner styling & status text
+      const banner = document.getElementById('stateAlertBanner');
+      const pulse = document.getElementById('statusPulse');
+      const statusText = document.getElementById('systemStatusText');
+
+      if (simState.isScuffing) {
+        banner.className = "p-3.5 rounded-xl border border-rose-500/80 bg-rose-950/40 backdrop-blur flex flex-wrap items-center justify-between gap-3 text-sm";
+        pulse.className = "w-3.5 h-3.5 rounded-full bg-rose-500 animate-ping";
+        statusText.className = "ml-2 font-mono text-rose-300 font-bold";
+        statusText.innerText = "CRITICAL: CYLINDER WALL CONTACT / METAL-ON-METAL SCUFFING IMMINENT";
+      } else if (simState.isWarning) {
+        banner.className = "p-3.5 rounded-xl border border-amber-500/80 bg-amber-950/40 backdrop-blur flex flex-wrap items-center justify-between gap-3 text-sm";
+        pulse.className = "w-3.5 h-3.5 rounded-full bg-amber-400 animate-pulse";
+        statusText.className = "ml-2 font-mono text-amber-300 font-bold";
+        statusText.innerText = "WARNING: BEARING SAG EXCEEDING ALLOWABLE RADIAL MARGIN";
+      } else {
+        banner.className = "p-3.5 rounded-xl border border-gray-800 bg-gray-900/50 backdrop-blur flex flex-wrap items-center justify-between gap-3 text-sm";
+        pulse.className = "w-3.5 h-3.5 rounded-full bg-cyan-400 animate-pulse";
+        statusText.className = "ml-2 font-mono text-cyan-300 font-semibold";
+        statusText.innerText = simState.autoCentering 
+          ? "ACTIVE CLOSED-LOOP CENTERING: HARMONICS COMPENSATED"
+          : "NOMINAL CONCENTRIC RECIPROCATION (OPEN-LOOP)";
+      }
+
+      // Quick Engine Card Text
+      document.getElementById('dispStroke').innerText = `± ${simState.strokeMax_mm.toFixed(1)} mm`;
+      document.getElementById('dispPeakV').innerText = `${(simState.strokeMax_mm * 1e-3 * 2 * Math.PI * simState.freq_hz).toFixed(2)} m/s`;
+      const thd = (simState.eccentricity * 12.5 + 0.35).toFixed(2);
+      document.getElementById('dispTHD').innerText = `${thd} %`;
+    }
+
+    // -------------------------------------------------------------------------
+    // USER INTERACTION & SLIDER HANDLERS
+    // -------------------------------------------------------------------------
+    function updateSimParameters() {
+      simState.radialSag_um = parseFloat(document.getElementById('sliderRadialSag').value);
+      simState.freq_hz = parseFloat(document.getElementById('sliderFrequency').value);
+      simState.magnetTemp_k = parseFloat(document.getElementById('sliderTemp').value);
+
+      document.getElementById('valRadialSag').innerText = `${simState.radialSag_um.toFixed(0)} µm`;
+      document.getElementById('valFrequency').innerText = `${simState.freq_hz.toFixed(1)} Hz`;
+      document.getElementById('valTemp').innerText = `${simState.magnetTemp_k.toFixed(0)} K`;
+    }
+
+    function toggleAutoCentering() {
+      simState.autoCentering = !simState.autoCentering;
+      const label = document.getElementById('autoCenteringLabel');
+      const btn = document.getElementById('toggleAutoCenteringBtn');
+      if (simState.autoCentering) {
+        label.innerText = "AUTONOMOUS DSP CENTERING: ON";
+        btn.className = "px-3 py-1 rounded-lg text-xs font-mono font-bold bg-cyan-600 hover:bg-cyan-500 text-black transition-all flex items-center gap-1.5 shadow-lg shadow-cyan-900/40";
+      } else {
+        label.innerText = "AUTONOMOUS DSP CENTERING: OFF";
+        btn.className = "px-3 py-1 rounded-lg text-xs font-mono font-bold bg-rose-600 hover:bg-rose-500 text-white transition-all flex items-center gap-1.5 shadow-lg shadow-rose-900/40";
+      }
+    }
+
+    function resetNominalState() {
+      document.getElementById('sliderRadialSag').value = 0;
+      document.getElementById('sliderFrequency').value = 60;
+      document.getElementById('sliderTemp').value = 420;
+      simState.autoCentering = true;
+      document.getElementById('autoCenteringLabel').innerText = "AUTONOMOUS DSP CENTERING: ON";
+      document.getElementById('toggleAutoCenteringBtn').className = "px-3 py-1 rounded-lg text-xs font-mono font-bold bg-cyan-600 hover:bg-cyan-500 text-black transition-all flex items-center gap-1.5 shadow-lg shadow-cyan-900/40";
+      updateSimParameters();
+    }
+
+    // Fault Scenario Injections
+    function injectPreset(type) {
+      if (type === 'nominal') {
+        resetNominalState();
+      } else if (type === 'launch_creep') {
+        document.getElementById('sliderRadialSag').value = 180;
+        document.getElementById('sliderFrequency').value = 60;
+        document.getElementById('sliderTemp').value = 430;
+        updateSimParameters();
+      } else if (type === 'thermal_distortion') {
+        document.getElementById('sliderRadialSag').value = 260;
+        document.getElementById('sliderFrequency').value = 63.5;
+        document.getElementById('sliderTemp').value = 590;
+        updateSimParameters();
+      } else if (type === 'runaway_sidepull') {
+        document.getElementById('sliderRadialSag').value = 420;
+        simState.autoCentering = false;
+        document.getElementById('autoCenteringLabel').innerText = "AUTONOMOUS DSP CENTERING: OFF";
+        document.getElementById('toggleAutoCenteringBtn').className = "px-3 py-1 rounded-lg text-xs font-mono font-bold bg-rose-600 hover:bg-rose-500 text-white transition-all flex items-center gap-1.5 shadow-lg shadow-rose-900/40";
+        updateSimParameters();
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // START SIMULATION ON LOAD
+    // -------------------------------------------------------------------------
+    window.onload = function() {
+      resizeCanvas();
+      setInterval(stepPhysics, 40);
+    };
+
+  </script>
+</body>
+</html>
